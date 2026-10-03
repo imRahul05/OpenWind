@@ -29,6 +29,14 @@ const CHANNELS = ["email", "sms", "whatsapp", "call"] as const;
 type Severity = (typeof SEVERITIES)[number];
 type Channel = (typeof CHANNELS)[number];
 
+const NOTIFY_CHECKBOXES: ReadonlyArray<{
+  key: "notifyBackup" | "notifyEscalationManager";
+  label: string;
+}> = [
+  { key: "notifyBackup", label: "Notify backup on-call" },
+  { key: "notifyEscalationManager", label: "Notify escalation manager" },
+] as const;
+
 interface Team {
   id: string;
   name: string;
@@ -402,46 +410,41 @@ function PolicyFormModal({
               ))}
             </select>
           </div>
-          <div className="form-group">
-            <label className="form-label">Team</label>
-            <select
-              className="form-input"
-              value={formData.teamId}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  teamId: e.target.value,
-                }))
-              }
-            >
-              <option value="">Any team</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Workflow</label>
-            <select
-              className="form-input"
-              value={formData.workflowTypeId}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  workflowTypeId: e.target.value,
-                }))
-              }
-            >
-              <option value="">Any workflow</option>
-              {workflows.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {[
+            {
+              key: "teamId" as const,
+              label: "Team",
+              defaultOption: "Any team",
+              options: teams,
+            },
+            {
+              key: "workflowTypeId" as const,
+              label: "Workflow",
+              defaultOption: "Any workflow",
+              options: workflows,
+            },
+          ].map(({ key, label, defaultOption, options }) => (
+            <div key={key} className="form-group">
+              <label className="form-label">{label}</label>
+              <select
+                className="form-input"
+                value={formData[key]}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    [key]: e.target.value,
+                  }))
+                }
+              >
+                <option value="">{defaultOption}</option>
+                {options.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
           <div className="form-group">
             <label className="form-label">Channels *</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
@@ -465,50 +468,30 @@ function PolicyFormModal({
               ))}
             </div>
           </div>
-          <div className="form-group">
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={formData.notifyBackup}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    notifyBackup: e.target.checked,
-                  }))
-                }
-              />
-              Notify backup on-call
-            </label>
-          </div>
-          <div className="form-group">
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={formData.notifyEscalationManager}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    notifyEscalationManager: e.target.checked,
-                  }))
-                }
-              />
-              Notify escalation manager
-            </label>
-          </div>
+          {NOTIFY_CHECKBOXES.map(({ key, label }) => (
+            <div key={key} className="form-group">
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={formData[key]}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      [key]: e.target.checked,
+                    }))
+                  }
+                />
+                {label}
+              </label>
+            </div>
+          ))}
           <Button
             type="submit"
             variant="primary"
@@ -595,46 +578,35 @@ function ResolveSimulator({
             ))}
           </select>
         </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">Team</label>
-          <select
-            className="form-input"
-            value={formData.teamId}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                teamId: e.target.value,
-              }))
-            }
-          >
-            <option value="">None</option>
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">Workflow</label>
-          <select
-            className="form-input"
-            value={formData.workflowTypeId}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                workflowTypeId: e.target.value,
-              }))
-            }
-          >
-            <option value="">None</option>
-            {workflows.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {[
+          { key: "teamId" as const, label: "Team", options: teams },
+          {
+            key: "workflowTypeId" as const,
+            label: "Workflow",
+            options: workflows,
+          },
+        ].map(({ key, label, options }) => (
+          <div key={key} className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">{label}</label>
+            <select
+              className="form-input"
+              value={formData[key]}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  [key]: e.target.value,
+                }))
+              }
+            >
+              <option value="">None</option>
+              {options.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
         <Button
           variant="primary"
           disabled={loading}
@@ -659,19 +631,22 @@ function ResolveSimulator({
             borderRadius: "var(--radius-sm)",
           }}
         >
-          <div>
-            <strong>Matched:</strong> {result.matchedAt}
-          </div>
-          <div>
-            <strong>Channels:</strong> {result.channels.join(", ")}
-          </div>
-          <div>
-            <strong>Notify backup:</strong> {result.notifyBackup ? "Yes" : "No"}
-          </div>
-          <div>
-            <strong>Notify escalation manager:</strong>{" "}
-            {result.notifyEscalationManager ? "Yes" : "No"}
-          </div>
+          {[
+            { label: "Matched", value: result.matchedAt },
+            { label: "Channels", value: result.channels.join(", ") },
+            {
+              label: "Notify backup",
+              value: result.notifyBackup ? "Yes" : "No",
+            },
+            {
+              label: "Notify escalation manager",
+              value: result.notifyEscalationManager ? "Yes" : "No",
+            },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <strong>{label}:</strong> {value}
+            </div>
+          ))}
           <div>
             <strong>Recipients:</strong>{" "}
             {result.recipients.length === 0

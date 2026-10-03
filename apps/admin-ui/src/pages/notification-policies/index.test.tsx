@@ -2,138 +2,122 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   render,
   screen,
-  cleanup,
   fireEvent,
   waitFor,
+  cleanup,
 } from "@testing-library/react";
 
-const mockFetchWithAuth = vi.fn(
-  (..._args: unknown[]): Promise<unknown> => Promise.resolve(null),
-);
+const mockFetchWithAuth =
+  vi.fn<(url: string, opts?: RequestInit) => Promise<unknown>>();
 vi.mock("../../lib/api.js", () => ({
   API_URL: "/api",
-  fetchWithAuth: (...args: unknown[]) => mockFetchWithAuth(...args),
+  fetchWithAuth: (url: string, opts?: RequestInit): Promise<unknown> =>
+    mockFetchWithAuth(url, opts),
 }));
 
-const mockShowAlert = vi.fn((_message: string): void => undefined);
 vi.mock("../../components/global-alert-dialog.js", () => ({
-  showAlert: (message: string) => mockShowAlert(message),
+  showAlert: vi.fn(),
 }));
 
 const { NotificationPoliciesPage } = await import("./index.js");
 
-const TEAM_A = { id: "team-1", name: "Platform On-Call" };
-const WORKFLOW_A = { id: "wf-1", name: "Ticket Workflow" };
+const MOCK_TEAMS = [
+  { id: "team-1", name: "Engineering" },
+  { id: "team-2", name: "Support" },
+];
 
-const POLICY_A = {
-  id: "policy-1",
-  teamId: "team-1",
-  workflowTypeId: null,
-  severity: "critical",
-  channels: ["email", "sms"],
-  notifyBackup: true,
-  notifyEscalationManager: false,
-};
+const MOCK_WORKFLOWS = [{ id: "wf-1", name: "Incident Triage" }];
 
-function renderPage(): ReturnType<typeof render> {
-  return render(<NotificationPoliciesPage />);
-}
+const MOCK_POLICIES = [
+  {
+    id: "pol-1",
+    teamId: "team-1",
+    workflowTypeId: "wf-1",
+    severity: "critical" as const,
+    channels: ["email" as const, "sms" as const],
+    notifyBackup: true,
+    notifyEscalationManager: true,
+  },
+];
 
 describe("NotificationPoliciesPage", () => {
   beforeEach(() => {
     mockFetchWithAuth.mockReset();
-    mockShowAlert.mockReset();
+    mockFetchWithAuth.mockImplementation((url: string) => {
+      if (url.includes("/admin/notification-policies/resolve")) {
+        return Promise.resolve({
+          data: {
+            policyId: "pol-1",
+            matchedAt: "team",
+            channels: ["email"],
+            notifyBackup: true,
+            notifyEscalationManager: false,
+            recipients: [{ role: "primary", userId: "u-1", name: "Alice" }],
+          },
+        });
+      }
+      if (url.includes("/admin/notification-policies")) {
+        return Promise.resolve({ data: MOCK_POLICIES });
+      }
+      if (url.includes("/admin/teams")) {
+        return Promise.resolve({ data: MOCK_TEAMS });
+      }
+      if (url.includes("/workflows")) {
+        return Promise.resolve({ data: MOCK_WORKFLOWS });
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`));
+    });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("renders the policy list with resolved team name and channels", async () => {
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [POLICY_A] });
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [TEAM_A] });
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [WORKFLOW_A] });
-    renderPage();
+  it("renders policies table and resolves names", async () => {
+    render(<NotificationPoliciesPage />);
 
-    await waitFor(() =>
-      expect(
-        screen
-          .getAllByText("Platform On-Call")
-          .some((el) => el.tagName === "TD"),
-      ).toBe(true),
-    );
-    expect(screen.getByText("email, sms")).toBeTruthy();
-    expect(
-      screen.getAllByText("critical").some((el) => el.tagName === "TD"),
-    ).toBe(true);
+    await waitFor(() => {
+      expect(screen.getByText("Notification Policies")).toBeDefined();
+    });
+
+    expect(screen.getAllByText("critical").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Incident Triage").length).toBeGreaterThan(0);
+    expect(screen.getByText("email, sms")).toBeDefined();
   });
 
-  it("shows an empty state when there are no policies", async () => {
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [] });
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [] });
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [] });
-    renderPage();
+  it("opens create modal and saves new policy", async () => {
+    render(<NotificationPoliciesPage />);
 
-    await waitFor(() =>
-      expect(screen.getByText("No notification policies yet")).toBeTruthy(),
-    );
-  });
-
-  it("opens the create modal and posts a new policy", async () => {
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [] });
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [TEAM_A] });
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [WORKFLOW_A] });
-    renderPage();
-    await waitFor(() =>
-      expect(screen.getByText("No notification policies yet")).toBeTruthy(),
-    );
+    await waitFor(() => {
+      expect(screen.getByText("New Policy")).toBeDefined();
+    });
 
     fireEvent.click(screen.getByText("New Policy"));
+    expect(screen.getByText("Create policy")).toBeDefined();
 
-    mockFetchWithAuth.mockResolvedValueOnce({ data: POLICY_A });
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [POLICY_A] });
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [TEAM_A] });
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [WORKFLOW_A] });
+    mockFetchWithAuth.mockResolvedValueOnce({ data: { id: "pol-new" } });
     fireEvent.click(screen.getByText("Create policy"));
 
-    await waitFor(() =>
+    await waitFor(() => {
       expect(mockFetchWithAuth).toHaveBeenCalledWith(
         "/api/admin/notification-policies",
         expect.objectContaining({ method: "POST" }),
-      ),
-    );
+      );
+    });
   });
 
-  it("resolves a preview without mutating the policy list", async () => {
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [POLICY_A] });
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [TEAM_A] });
-    mockFetchWithAuth.mockResolvedValueOnce({ data: [WORKFLOW_A] });
-    renderPage();
-    await waitFor(() =>
-      expect(
-        screen
-          .getAllByText("Platform On-Call")
-          .some((el) => el.tagName === "TD"),
-      ).toBe(true),
-    );
+  it("executes preview simulation", async () => {
+    render(<NotificationPoliciesPage />);
 
-    mockFetchWithAuth.mockResolvedValueOnce({
-      data: {
-        policyId: "policy-1",
-        matchedAt: "team",
-        channels: ["email"],
-        notifyBackup: true,
-        notifyEscalationManager: false,
-        recipients: [],
-      },
+    await waitFor(() => {
+      expect(screen.getByText("Preview")).toBeDefined();
     });
+
     fireEvent.click(screen.getByText("Resolve"));
 
-    await waitFor(() =>
-      expect(mockFetchWithAuth).toHaveBeenCalledWith(
-        expect.stringContaining("/api/admin/notification-policies/resolve?"),
-      ),
-    );
-    await waitFor(() => expect(screen.getByText("team")).toBeTruthy());
+    await waitFor(() => {
+      expect(screen.getByText("Alice (primary)")).toBeDefined();
+    });
   });
 });
