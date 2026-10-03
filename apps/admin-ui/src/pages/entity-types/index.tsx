@@ -14,6 +14,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
+  LoadingScreen,
 } from "@platform/ui";
 import { fetchWithAuth, API_URL } from "../../lib/api.js";
 import { isRenderableIcon } from "../../lib/icon.js";
@@ -86,12 +87,7 @@ export function EntityTypes(): React.ReactElement {
   }
 
   if (isLoading) {
-    return (
-      <div className="loading-center">
-        <div className="spinner" />
-        <span className="loader-text">Loading entity types…</span>
-      </div>
-    );
+    return <LoadingScreen text="Loading entity types…" />;
   }
 
   return (

@@ -9,6 +9,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
+  LoadingScreen,
 } from "@platform/ui";
 import { fetchWithAuth, API_URL } from "../../lib/api.js";
 import { ConfirmDeleteDialog } from "../../components/confirm-delete-dialog.js";
@@ -140,10 +141,7 @@ export function Automations(): React.ReactElement {
       )}
 
       {loading ? (
-        <div className="loading-center">
-          <div className="spinner" />
-          <p className="loader-text">Loading rules…</p>
-        </div>
+        <LoadingScreen text="Loading rules…" />
       ) : rules.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">⚡</div>

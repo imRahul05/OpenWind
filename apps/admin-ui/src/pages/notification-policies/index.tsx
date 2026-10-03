@@ -19,6 +19,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
+  LoadingScreen,
 } from "@platform/ui";
 import { fetchWithAuth, API_URL } from "../../lib/api.js";
 import { showAlert } from "../../components/global-alert-dialog.js";
@@ -128,12 +129,7 @@ export function NotificationPoliciesPage(): React.ReactElement {
   }
 
   if (loading) {
-    return (
-      <div className="loading-center">
-        <div className="spinner" />
-        <span className="loader-text">Loading notification policies…</span>
-      </div>
-    );
+    return <LoadingScreen text="Loading notification policies…" />;
   }
 
   return (

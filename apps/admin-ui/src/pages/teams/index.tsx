@@ -19,6 +19,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
+  LoadingScreen,
 } from "@platform/ui";
 import { fetchWithAuth, API_URL } from "../../lib/api.js";
 import { showAlert } from "../../components/global-alert-dialog.js";
@@ -68,12 +69,7 @@ export function TeamsPage(): React.ReactElement {
   }
 
   if (loading) {
-    return (
-      <div className="loading-center">
-        <div className="spinner" />
-        <span className="loader-text">Loading teams…</span>
-      </div>
-    );
+    return <LoadingScreen text="Loading teams…" />;
   }
 
   return (

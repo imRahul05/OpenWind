@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button } from "@platform/ui";
+import { Button, LoadingScreen } from "@platform/ui";
 import { fetchWithAuth, API_URL } from "../../lib/api.js";
 import { ConfirmDeleteDialog } from "../../components/confirm-delete-dialog.js";
 import { showAlert } from "../../components/global-alert-dialog.js";
@@ -208,12 +208,7 @@ export function ApiKeyApplicationDetail(): React.ReactElement {
   }
 
   if (isLoading) {
-    return (
-      <div className="loading-center">
-        <div className="spinner" />
-        <span className="loader-text">Loading application…</span>
-      </div>
-    );
+    return <LoadingScreen text="Loading application…" />;
   }
 
   const application = groupKeysByApplication(keys).find(

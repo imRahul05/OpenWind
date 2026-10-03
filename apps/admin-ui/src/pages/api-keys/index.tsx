@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@platform/ui";
+import { Button, LoadingScreen } from "@platform/ui";
 import { fetchWithAuth, API_URL } from "../../lib/api.js";
 import { showAlert } from "../../components/global-alert-dialog.js";
 import { CreateApiKeyModal } from "./create.js";
@@ -47,12 +47,7 @@ export function ApiKeys(): React.ReactElement {
   }, [refresh]);
 
   if (isLoading) {
-    return (
-      <div className="loading-center">
-        <div className="spinner" />
-        <span className="loader-text">Loading API keys…</span>
-      </div>
-    );
+    return <LoadingScreen text="Loading API keys…" />;
   }
 
   const applications = groupKeysByApplication(keys);
