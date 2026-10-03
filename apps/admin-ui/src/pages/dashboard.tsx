@@ -11,6 +11,8 @@ import {
 } from "../lib/notifications-client.js";
 import { relativeTime, toWorkflowSlug } from "../lib/format.js";
 import { withAlpha } from "../lib/theme.js";
+import { DonutChart } from "../components/donut-chart.js";
+import { SectionHeader } from "../components/section-header.js";
 
 // ── Personal dashboard ("My View") — docs/specs/personal-dashboard.md ─────────
 // Reachable by every authenticated role. Gives the logged-in user a status
@@ -204,78 +206,6 @@ function buildStateMix(
 
 // ── small chart primitives (inline SVG — matches analytics.tsx's convention,
 // no charting library in this repo) ───────────────────────────────────────────
-
-function Donut({
-  segments,
-  size = 120,
-  strokeWidth = 16,
-}: {
-  segments: { label: string; value: number; color: string }[];
-  size?: number;
-  strokeWidth?: number;
-}): React.ReactElement {
-  const total = segments.reduce((sum, s) => sum + s.value, 0);
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  let offsetAccum = 0;
-
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke="var(--bg-tertiary)"
-        strokeWidth={strokeWidth}
-      />
-      {total > 0 &&
-        segments.map((s) => {
-          const frac = s.value / total;
-          const dash = frac * circumference;
-          const dashArray = `${dash} ${circumference - dash}`;
-          const dashOffset = -offsetAccum * circumference;
-          offsetAccum += frac;
-          return (
-            <circle
-              key={s.label}
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              fill="none"
-              stroke={s.color}
-              strokeWidth={strokeWidth}
-              strokeDasharray={dashArray}
-              strokeDashoffset={dashOffset}
-              transform={`rotate(-90 ${size / 2} ${size / 2})`}
-              strokeLinecap="butt"
-            />
-          );
-        })}
-      <text
-        x="50%"
-        y="47%"
-        textAnchor="middle"
-        fontSize="22"
-        fontWeight="800"
-        fill="var(--text-primary)"
-      >
-        {total}
-      </text>
-      <text
-        x="50%"
-        y="64%"
-        textAnchor="middle"
-        fontSize="9"
-        fontWeight="600"
-        letterSpacing="0.05em"
-        fill="var(--text-muted)"
-      >
-        TICKETS
-      </text>
-    </svg>
-  );
-}
 
 // Shimmer placeholder shaped like the content it stands in for, instead of a
 // plain "Loading…" line in every card.
@@ -919,66 +849,6 @@ function TicketDueDateTable({
   );
 }
 
-function SectionHeader({
-  title,
-  icon,
-  color,
-  action,
-}: {
-  title: string;
-  icon?: string;
-  color?: string;
-  action?: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        flexWrap: "wrap",
-        rowGap: "10px",
-        paddingBottom: "14px",
-        borderBottom: "1px solid var(--border-color)",
-        marginBottom: "16px",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        {icon && (
-          <div
-            style={{
-              width: "26px",
-              height: "26px",
-              borderRadius: "8px",
-              background: withAlpha(color ?? "hsl(211,100%,50%)", 0.14),
-              border: `1px solid ${withAlpha(color ?? "hsl(211,100%,50%)", 0.28)}`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "13px",
-              flexShrink: 0,
-            }}
-          >
-            {icon}
-          </div>
-        )}
-        <h3
-          style={{
-            fontSize: "13.5px",
-            fontWeight: 700,
-            color: "var(--text-primary)",
-            letterSpacing: "0.01em",
-            margin: 0,
-          }}
-        >
-          {title}
-        </h3>
-      </div>
-      {action}
-    </div>
-  );
-}
-
 // Card wrapper — data-panel with a colored top accent bar so panels read as
 // distinct sections at a glance instead of a stack of identical gray boxes.
 function Card({
@@ -1444,7 +1314,7 @@ export function Dashboard(): React.ReactElement {
                   {/* Donut already renders a full grey ring with a literal
                         "0" center label when segments total 0 - no separate
                         empty-state branch needed. */}
-                  <Donut segments={stateMix} />
+                  <DonutChart segments={stateMix} />
                   <div style={{ flex: "1 1 160px", minWidth: 0 }}>
                     <Legend segments={stateMix} />
                   </div>

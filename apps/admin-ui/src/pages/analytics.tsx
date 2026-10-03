@@ -6,6 +6,8 @@ import { relativeTime } from "../lib/format.js";
 import { withAlpha } from "../lib/theme.js";
 import { userManager } from "../authProvider.js";
 import { Button } from "@platform/ui";
+import { DonutChart } from "../components/donut-chart.js";
+import { SectionHeader } from "../components/section-header.js";
 
 type WorkflowState = {
   name: string;
@@ -341,168 +343,6 @@ function Sparkline({
       />
       <circle cx={lastX} cy={lastY} r="2" fill={color} />
     </svg>
-  );
-}
-
-function Donut({
-  segments,
-  size = 108,
-  strokeWidth = 14,
-}: {
-  segments: Array<{ label: string; value: number; color: string }>;
-  size?: number;
-  strokeWidth?: number;
-}): React.ReactElement {
-  const total = segments.reduce((sum, s) => sum + s.value, 0);
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  let offsetAccum = 0;
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="var(--bg-tertiary)"
-          strokeWidth={strokeWidth}
-        />
-        {total > 0 &&
-          segments.map((s) => {
-            const frac = s.value / total;
-            const dash = frac * circumference;
-            const dashArray = `${dash} ${circumference - dash}`;
-            const dashOffset = -offsetAccum * circumference;
-            offsetAccum += frac;
-            return (
-              <circle
-                key={s.label}
-                cx={size / 2}
-                cy={size / 2}
-                r={radius}
-                fill="none"
-                stroke={s.color}
-                strokeWidth={strokeWidth}
-                strokeDasharray={dashArray}
-                strokeDashoffset={dashOffset}
-                transform={`rotate(-90 ${size / 2} ${size / 2})`}
-                strokeLinecap="butt"
-              />
-            );
-          })}
-        <text
-          x="50%"
-          y="47%"
-          textAnchor="middle"
-          fontSize="20"
-          fontWeight="800"
-          fill="var(--text-primary)"
-        >
-          {total}
-        </text>
-        <text
-          x="50%"
-          y="63%"
-          textAnchor="middle"
-          fontSize="9"
-          fontWeight="600"
-          letterSpacing="0.05em"
-          fill="var(--text-muted)"
-        >
-          RECORDS
-        </text>
-      </svg>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "6px",
-          flex: 1,
-          minWidth: 0,
-        }}
-      >
-        {segments.slice(0, 5).map((s) => (
-          <div
-            key={s.label}
-            style={{ display: "flex", alignItems: "center", gap: "8px" }}
-          >
-            <span
-              style={{
-                width: "8px",
-                height: "8px",
-                borderRadius: "2px",
-                background: s.color,
-                flexShrink: 0,
-              }}
-            />
-            <span
-              style={{
-                fontSize: "12px",
-                color: "var(--text-secondary)",
-                flex: 1,
-                minWidth: 0,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {s.label}
-            </span>
-            <span
-              style={{
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "var(--text-primary)",
-              }}
-            >
-              {s.value}
-            </span>
-          </div>
-        ))}
-        {total === 0 && (
-          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-            No records yet
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SectionHeader({
-  title,
-  action,
-}: {
-  title: string;
-  action?: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingBottom: "12px",
-        borderBottom: "1px solid var(--border-color)",
-        marginBottom: "16px",
-      }}
-    >
-      <h3
-        style={{
-          fontSize: "13px",
-          fontWeight: 700,
-          color: "var(--text-muted)",
-          textTransform: "uppercase",
-          letterSpacing: "0.07em",
-          margin: 0,
-        }}
-      >
-        {title}
-      </h3>
-      {action}
-    </div>
   );
 }
 
@@ -1453,7 +1293,13 @@ export function Analytics(): React.ReactElement {
                 />
               </div>
             ) : (
-              <Donut segments={donutSegments} />
+              <DonutChart
+                segments={donutSegments}
+                size={108}
+                strokeWidth={14}
+                centerLabel="RECORDS"
+                showLegend
+              />
             )}
           </div>
 
