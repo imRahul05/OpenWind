@@ -7,11 +7,13 @@ import {
   DIALOG_CONTENT_RESET,
 } from "@platform/ui";
 
+export type RequestAccessLevel = "read_only" | "read_comment" | "read_write";
+
 export interface RequestAccessDialogProps {
-  level: "read_only" | "read_comment" | null;
+  level: RequestAccessLevel | null;
   requesting: boolean;
   onClose: () => void;
-  onConfirm: (level: "read_only" | "read_comment") => Promise<void> | void;
+  onConfirm: (level: RequestAccessLevel) => Promise<void> | void;
 }
 
 export function RequestAccessDialog({

@@ -47,6 +47,11 @@ import {
   CreateSubtaskDialog,
   type CreateSubtaskFormData,
 } from "./dialogs/create-subtask-dialog.js";
+import {
+  TransitionDialog,
+  type Transition,
+} from "./dialogs/transition-dialog.js";
+import { RequestAccessDialog } from "./dialogs/request-access-dialog.js";
 
 type EntityField = {
   id: string;
@@ -105,13 +110,7 @@ type ChildInstance = {
   createdAt: string;
   origin?: Origin;
 };
-type Transition = {
-  id: string;
-  fromState: string;
-  toState: string;
-  label: string;
-  requiresComment: boolean;
-};
+
 type WorkflowState = {
   id: string;
   name: string;
@@ -1049,7 +1048,6 @@ export function CustomerRecordDetail(): React.ReactElement {
   >("idle");
   const [transitioning, setTransitioning] = useState<string | null>(null);
   const [stateModal, setStateModal] = useState<Transition | null>(null);
-  const [comment, setComment] = useState("");
   const [transError, setTransError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, unknown>>({});
@@ -2594,7 +2592,6 @@ export function CustomerRecordDetail(): React.ReactElement {
           }),
         });
       }
-      setComment("");
       setStateModal(null);
       setLoading(true);
       void loadRecord();
@@ -5451,143 +5448,24 @@ export function CustomerRecordDetail(): React.ReactElement {
       )}
 
       {/* ── Transition modal ─────────────────────────────── */}
-      <Dialog
-        open={stateModal !== null}
-        onOpenChange={(next) => {
-          if (!next) {
-            setStateModal(null);
-            setComment("");
-          }
-        }}
-      >
-        <DialogContent
-          showCloseButton={false}
-          className="modal"
-          style={DIALOG_CONTENT_RESET}
-        >
-          <div className="modal-header">
-            <DialogTitle asChild>
-              <h3 className="modal-title">
-                Move to "
-                {(stateModal?.label ?? "") || (stateModal?.toState ?? "")}"
-              </h3>
-            </DialogTitle>
-            <DialogClose asChild>
-              <button type="button" className="modal-close" aria-label="Close">
-                ×
-              </button>
-            </DialogClose>
-          </div>
-          <div className="modal-body">
-            <p className="rcd-modal-desc">
-              This will transition the record from{" "}
-              <strong>{record.currentState}</strong> to{" "}
-              <strong>{stateModal?.toState}</strong>.
-            </p>
-            <div className="form-group">
-              <label className="form-label">
-                Comment {stateModal?.requiresComment ? "*" : "(optional)"}
-              </label>
-              <textarea
-                className="form-input portal-textarea"
-                rows={3}
-                placeholder="Add a note about this transition…"
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                autoFocus
-              />
-            </div>
-          </div>
-          <div className="modal-footer">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setStateModal(null);
-                setComment("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              disabled={
-                (Boolean(stateModal?.requiresComment) && !comment.trim()) ||
-                transitioning === stateModal?.id
-              }
-              onClick={() => {
-                if (!stateModal) return;
-                void executeTransition(stateModal, comment || undefined);
-              }}
-            >
-              {transitioning === stateModal?.id ? "Moving…" : "Confirm"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TransitionDialog
+        transition={stateModal}
+        currentState={record.currentState}
+        isTransitioning={transitioning === stateModal?.id}
+        onClose={() => setStateModal(null)}
+        onConfirm={(trans, comment) => executeTransition(trans, comment)}
+      />
 
-      {/* Confirm access-request modal. Previously gated `!accessDenied &&`
-          to dodge a z-index conflict with the separate rcd-access-overlay's
-          own duplicate of this modal — now a real Radix Dialog, so its
-          portal renders above everything and that workaround (and the
-          duplicate content inside rcd-access-overlay) is no longer needed. */}
-      <Dialog
-        open={confirmReqLevel !== null}
-        onOpenChange={(next) => {
-          if (!next) setConfirmReqLevel(null);
+      {/* Confirm access-request modal. */}
+      <RequestAccessDialog
+        level={confirmReqLevel}
+        requesting={requestingAccess}
+        onClose={() => setConfirmReqLevel(null)}
+        onConfirm={(lvl) => {
+          setConfirmReqLevel(null);
+          void submitAccessRequest(lvl);
         }}
-      >
-        <DialogContent
-          showCloseButton={false}
-          className="modal"
-          style={DIALOG_CONTENT_RESET}
-        >
-          <div className="modal-header">
-            <DialogTitle asChild>
-              <span className="modal-title">Request access?</span>
-            </DialogTitle>
-            <DialogClose asChild>
-              <button type="button" className="modal-close" aria-label="Close">
-                ×
-              </button>
-            </DialogClose>
-          </div>
-          <div className="modal-body">
-            <p
-              style={{
-                margin: "0 0 18px",
-                color: "var(--text-secondary)",
-                fontSize: "14px",
-              }}
-            >
-              {confirmReqLevel === "read_comment"
-                ? "This will send a request to the ticket owner for comment access. They will be able to approve or decline."
-                : "This will send a request to the ticket owner for view access. They will be able to approve or decline."}
-            </p>
-            <div className="rcd-access-modal-actions">
-              <button
-                type="button"
-                className="portal-btn-secondary"
-                onClick={() => setConfirmReqLevel(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="portal-btn-primary"
-                disabled={requestingAccess}
-                onClick={() => {
-                  if (confirmReqLevel === null) return;
-                  const lvl = confirmReqLevel;
-                  setConfirmReqLevel(null);
-                  void submitAccessRequest(lvl);
-                }}
-              >
-                {requestingAccess ? "Sending…" : "Send Request"}
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      />
 
       {/* ── Resolve access-request modal ─────────────────────── */}
       <Dialog
