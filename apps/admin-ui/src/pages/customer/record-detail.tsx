@@ -24,13 +24,6 @@ import {
   DialogContent,
   DialogTitle,
   DialogClose,
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogAction,
-  AlertDialogCancel,
   Button,
   DIALOG_CONTENT_RESET,
 } from "@platform/ui";
@@ -47,6 +40,8 @@ import {
   type Severity,
 } from "../../components/severity-tag.js";
 import { formatFieldValue } from "../../lib/format.js";
+import { ArchiveConfirmDialog } from "./dialogs/archive-confirm-dialog.js";
+import { AddTagDialog } from "./dialogs/add-tag-dialog.js";
 
 type EntityField = {
   id: string;
@@ -1360,9 +1355,6 @@ export function CustomerRecordDetail(): React.ReactElement {
   const [tags, setTags] = useState<EntityInstanceTag[]>([]);
   const [tagsLoading, setTagsLoading] = useState(false);
   const [tagModalOpen, setTagModalOpen] = useState(false);
-  const [newTagText, setNewTagText] = useState("");
-  const [addingTag, setAddingTag] = useState(false);
-  const [tagError, setTagError] = useState<string | null>(null);
   const [removingTagId, setRemovingTagId] = useState<string | null>(null);
   const [settingSeverity, setSettingSeverity] = useState(false);
 
@@ -2727,25 +2719,14 @@ export function CustomerRecordDetail(): React.ReactElement {
     }
   }
 
-  async function addTag(): Promise<void> {
-    const text = newTagText.trim();
-    if (!id || !text || addingTag) return;
-    setAddingTag(true);
-    setTagError(null);
-    try {
-      const res = await fetchWithAuth(`${API_URL}/entities/${id}/tags`, {
-        method: "POST",
-        body: JSON.stringify({ tagText: text }),
-      });
-      const created = (res as { data: EntityInstanceTag }).data;
-      setTags((prev) => [...prev, created]);
-      setNewTagText("");
-      setTagModalOpen(false);
-    } catch (err) {
-      setTagError(err instanceof Error ? err.message : "Failed to add tag");
-    } finally {
-      setAddingTag(false);
-    }
+  async function handleAddTag(tagText: string): Promise<void> {
+    if (!id) return;
+    const res = await fetchWithAuth(`${API_URL}/entities/${id}/tags`, {
+      method: "POST",
+      body: JSON.stringify({ tagText }),
+    });
+    const created = (res as { data: EntityInstanceTag }).data;
+    setTags((prev) => [...prev, created]);
   }
 
   async function removeTag(tagId: string): Promise<void> {
@@ -3746,8 +3727,6 @@ export function CustomerRecordDetail(): React.ReactElement {
                             className="rcd-kebab-menu-item"
                             onClick={() => {
                               setKebabMenuOpen(false);
-                              setNewTagText("");
-                              setTagError(null);
                               setTagModalOpen(true);
                             }}
                           >
@@ -3980,8 +3959,6 @@ export function CustomerRecordDetail(): React.ReactElement {
                     borderStyle: "dashed",
                   }}
                   onClick={() => {
-                    setNewTagText("");
-                    setTagError(null);
                     setTagModalOpen(true);
                   }}
                 >
@@ -5416,53 +5393,15 @@ export function CustomerRecordDetail(): React.ReactElement {
       </Dialog>
 
       {/* ── Archive confirmation modal ───────────────────── */}
-      <AlertDialog
+      <ArchiveConfirmDialog
         open={archiveConfirm !== null}
+        childCount={archiveConfirm?.childCount ?? 0}
+        loading={archiving}
         onOpenChange={(next) => {
           if (!next) setArchiveConfirm(null);
         }}
-      >
-        <AlertDialogContent className="modal" style={DIALOG_CONTENT_RESET}>
-          <div className="modal-header">
-            <AlertDialogTitle asChild>
-              <h3 className="modal-title">Archive this record?</h3>
-            </AlertDialogTitle>
-          </div>
-          <div className="modal-body">
-            <AlertDialogDescription asChild>
-              <p className="rcd-modal-desc">
-                This record has{" "}
-                <strong>
-                  {archiveConfirm?.childCount ?? 0} sub-task
-                  {(archiveConfirm?.childCount ?? 0) !== 1 ? "s" : ""}
-                </strong>
-                . Archiving will also archive all of them. This can be undone
-                with Restore.
-              </p>
-            </AlertDialogDescription>
-          </div>
-          <AlertDialogFooter className="modal-footer">
-            <AlertDialogCancel asChild>
-              <Button variant="secondary">Cancel</Button>
-            </AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button
-                variant="primary"
-                className="rcd-btn-archive-confirm"
-                disabled={archiving}
-                onClick={(e) => {
-                  e.preventDefault();
-                  void archiveRecord(true);
-                }}
-              >
-                {archiving
-                  ? "Archiving…"
-                  : `Archive all ${(archiveConfirm?.childCount ?? 0) + 1}`}
-              </Button>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={() => archiveRecord(true)}
+      />
 
       {/* ── Create sub-task modal ────────────────────────── */}
       <Dialog
@@ -5569,73 +5508,11 @@ export function CustomerRecordDetail(): React.ReactElement {
       </Dialog>
 
       {/* ── Add tag modal (docs/specs/ticket-severity-and-tags.md R4) ──── */}
-      <Dialog
+      <AddTagDialog
         open={tagModalOpen}
-        onOpenChange={(next) => {
-          if (!next) {
-            setTagModalOpen(false);
-            setNewTagText("");
-            setTagError(null);
-          }
-        }}
-      >
-        <DialogContent
-          showCloseButton={false}
-          className="modal"
-          style={DIALOG_CONTENT_RESET}
-        >
-          <div className="modal-header">
-            <DialogTitle asChild>
-              <h3 className="modal-title">Add tag</h3>
-            </DialogTitle>
-            <DialogClose asChild>
-              <button type="button" className="modal-close" aria-label="Close">
-                ×
-              </button>
-            </DialogClose>
-          </div>
-          <div className="modal-body">
-            {tagError && (
-              <div
-                className="portal-alert-error"
-                style={{ marginBottom: "12px" }}
-              >
-                {tagError}
-              </div>
-            )}
-            <div className="form-group">
-              <label className="form-label">Tag</label>
-              <input
-                className="form-input"
-                type="text"
-                placeholder="e.g. railways"
-                value={newTagText}
-                disabled={addingTag}
-                onChange={(e) => setNewTagText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void addTag();
-                  }
-                }}
-                autoFocus
-              />
-            </div>
-          </div>
-          <div className="modal-footer">
-            <Button variant="secondary" onClick={() => setTagModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              disabled={addingTag || !newTagText.trim()}
-              onClick={() => void addTag()}
-            >
-              {addingTag ? "Adding…" : "Add"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={setTagModalOpen}
+        onAddTag={handleAddTag}
+      />
 
       {/* ── Link ticket modal ────────────────────────────── */}
       {showLinkModal && (
