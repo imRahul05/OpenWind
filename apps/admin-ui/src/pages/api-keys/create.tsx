@@ -46,24 +46,111 @@ export interface CreateApiKeyModalProps {
   onCreated: () => void;
 }
 
+interface CreateApiKeyFormData {
+  applicationName: string;
+  applicationDescription: string;
+  applicationContactEmail: string;
+  oidcClientId: string;
+  identityProviderMode: IdentityProviderMode;
+  externalIssuer: string;
+  externalOrgId: string;
+  scopeMode: ScopeMode;
+  customScopes: string[];
+}
+
+const INITIAL_FORM_DATA: CreateApiKeyFormData = {
+  applicationName: "",
+  applicationDescription: "",
+  applicationContactEmail: "",
+  oidcClientId: "",
+  identityProviderMode: "same",
+  externalIssuer: "",
+  externalOrgId: "",
+  scopeMode: "read-only",
+  customScopes: [],
+};
+
+interface FormFieldConfig {
+  key:
+    | "applicationName"
+    | "applicationDescription"
+    | "applicationContactEmail"
+    | "oidcClientId"
+    | "externalIssuer"
+    | "externalOrgId";
+  label: string;
+  placeholder: string;
+  type?: string;
+  required?: boolean;
+  autoFocus?: boolean;
+}
+
+const APP_FIELDS: readonly FormFieldConfig[] = [
+  {
+    key: "applicationName",
+    label: "Application Name *",
+    placeholder: "e.g. Acme Helpdesk Sync",
+    required: true,
+    autoFocus: true,
+  },
+  {
+    key: "applicationDescription",
+    label: "Description",
+    placeholder: "What this integration does",
+  },
+  {
+    key: "applicationContactEmail",
+    label: "Application Contact Email *",
+    placeholder: "ops@example.com",
+    type: "email",
+    required: true,
+  },
+  {
+    key: "oidcClientId",
+    label: "OIDC Client ID *",
+    placeholder: "acme-helpdesk-sync-client",
+    required: true,
+  },
+] as const;
+
+const EXTERNAL_IDP_FIELDS: readonly FormFieldConfig[] = [
+  {
+    key: "externalIssuer",
+    label: "Issuer URL *",
+    placeholder: "https://auth.example.com",
+    type: "url",
+    required: true,
+  },
+  {
+    key: "externalOrgId",
+    label: "External Org ID *",
+    placeholder: "the org id this application's users belong to on that issuer",
+    required: true,
+  },
+] as const;
+
 export function CreateApiKeyModal({
   open,
   onClose,
   onCreated,
 }: CreateApiKeyModalProps): React.ReactElement {
-  const [applicationName, setApplicationName] = useState("");
-  const [applicationDescription, setApplicationDescription] = useState("");
-  const [applicationContactEmail, setApplicationContactEmail] = useState("");
-  const [oidcClientId, setOidcClientId] = useState("");
-  const [identityProviderMode, setIdentityProviderMode] =
-    useState<IdentityProviderMode>("same");
-  const [externalIssuer, setExternalIssuer] = useState("");
-  const [externalOrgId, setExternalOrgId] = useState("");
-  const [scopeMode, setScopeMode] = useState<ScopeMode>("read-only");
-  const [customScopes, setCustomScopes] = useState<string[]>([]);
+  const [formData, setFormData] =
+    useState<CreateApiKeyFormData>(INITIAL_FORM_DATA);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+
+  const {
+    applicationName,
+    applicationDescription,
+    applicationContactEmail,
+    oidcClientId,
+    identityProviderMode,
+    externalIssuer,
+    externalOrgId,
+    scopeMode,
+    customScopes,
+  } = formData;
 
   const scopes =
     scopeMode === "read-only"
@@ -80,23 +167,25 @@ export function CreateApiKeyModal({
     (identityProviderMode === "same" ||
       (externalIssuer.trim().length > 0 && externalOrgId.trim().length > 0));
 
+  function updateField<K extends keyof CreateApiKeyFormData>(
+    key: K,
+    value: CreateApiKeyFormData[K],
+  ): void {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+  }
+
   function resetForm(): void {
-    setApplicationName("");
-    setApplicationDescription("");
-    setApplicationContactEmail("");
-    setOidcClientId("");
-    setIdentityProviderMode("same");
-    setExternalIssuer("");
-    setExternalOrgId("");
-    setScopeMode("read-only");
-    setCustomScopes([]);
+    setFormData(INITIAL_FORM_DATA);
     setError(null);
     setCreatedKey(null);
   }
 
   function toggleCustomScope(scope: string): void {
-    setCustomScopes((prev) =>
-      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope],
+    updateField(
+      "customScopes",
+      customScopes.includes(scope)
+        ? customScopes.filter((s) => s !== scope)
+        : [...customScopes, scope],
     );
   }
 
@@ -216,52 +305,20 @@ export function CreateApiKeyModal({
             )}
 
             <form onSubmit={(e) => void handleCreate(e)}>
-              <div className="form-group">
-                <label className="form-label">Application Name *</label>
-                <input
-                  className="form-input"
-                  placeholder="e.g. Acme Helpdesk Sync"
-                  value={applicationName}
-                  autoFocus
-                  onChange={(e) => setApplicationName(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Description</label>
-                <input
-                  className="form-input"
-                  placeholder="What this integration does"
-                  value={applicationDescription}
-                  onChange={(e) => setApplicationDescription(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  Application Contact Email *
-                </label>
-                <input
-                  className="form-input"
-                  type="email"
-                  placeholder="ops@example.com"
-                  value={applicationContactEmail}
-                  onChange={(e) => setApplicationContactEmail(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">OIDC Client ID *</label>
-                <input
-                  className="form-input"
-                  placeholder="acme-helpdesk-sync-client"
-                  value={oidcClientId}
-                  onChange={(e) => setOidcClientId(e.target.value)}
-                  required
-                />
-              </div>
+              {APP_FIELDS.map((f) => (
+                <div key={f.key} className="form-group">
+                  <label className="form-label">{f.label}</label>
+                  <input
+                    className="form-input"
+                    type={f.type ?? "text"}
+                    placeholder={f.placeholder}
+                    value={formData[f.key]}
+                    autoFocus={f.autoFocus}
+                    onChange={(e) => updateField(f.key, e.target.value)}
+                    required={f.required}
+                  />
+                </div>
+              ))}
 
               <div className="form-group">
                 <label className="form-label">Identity Provider *</label>
@@ -271,7 +328,7 @@ export function CreateApiKeyModal({
                     variant={
                       identityProviderMode === "same" ? "primary" : "secondary"
                     }
-                    onClick={() => setIdentityProviderMode("same")}
+                    onClick={() => updateField("identityProviderMode", "same")}
                   >
                     Same auth provider
                   </Button>
@@ -282,7 +339,9 @@ export function CreateApiKeyModal({
                         ? "primary"
                         : "secondary"
                     }
-                    onClick={() => setIdentityProviderMode("external")}
+                    onClick={() =>
+                      updateField("identityProviderMode", "external")
+                    }
                   >
                     External provider
                   </Button>
@@ -309,31 +368,20 @@ export function CreateApiKeyModal({
                     "Only choose this if the application's end users log in through a completely different identity provider than this platform's own — e.g. their own separate OIDC tenant."
                   )}
                 </p>
-                {identityProviderMode === "external" && (
-                  <>
-                    <div className="form-group">
-                      <label className="form-label">Issuer URL *</label>
+                {identityProviderMode === "external" &&
+                  EXTERNAL_IDP_FIELDS.map((f) => (
+                    <div key={f.key} className="form-group">
+                      <label className="form-label">{f.label}</label>
                       <input
                         className="form-input"
-                        type="url"
-                        placeholder="https://auth.example.com"
-                        value={externalIssuer}
-                        onChange={(e) => setExternalIssuer(e.target.value)}
-                        required
+                        type={f.type ?? "text"}
+                        placeholder={f.placeholder}
+                        value={formData[f.key]}
+                        onChange={(e) => updateField(f.key, e.target.value)}
+                        required={f.required}
                       />
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">External Org ID *</label>
-                      <input
-                        className="form-input"
-                        placeholder="the org id this application's users belong to on that issuer"
-                        value={externalOrgId}
-                        onChange={(e) => setExternalOrgId(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </>
-                )}
+                  ))}
               </div>
 
               <div className="form-group">
@@ -344,7 +392,7 @@ export function CreateApiKeyModal({
                     variant={
                       scopeMode === "read-only" ? "primary" : "secondary"
                     }
-                    onClick={() => setScopeMode("read-only")}
+                    onClick={() => updateField("scopeMode", "read-only")}
                   >
                     Read-only
                   </Button>
@@ -353,14 +401,14 @@ export function CreateApiKeyModal({
                     variant={
                       scopeMode === "read-write" ? "primary" : "secondary"
                     }
-                    onClick={() => setScopeMode("read-write")}
+                    onClick={() => updateField("scopeMode", "read-write")}
                   >
                     Read-write
                   </Button>
                   <Button
                     type="button"
                     variant={scopeMode === "custom" ? "primary" : "secondary"}
-                    onClick={() => setScopeMode("custom")}
+                    onClick={() => updateField("scopeMode", "custom")}
                   >
                     Custom
                   </Button>

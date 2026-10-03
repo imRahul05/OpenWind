@@ -15,6 +15,39 @@ export interface EditApiKeyModalProps {
   onSaved: () => void;
 }
 
+interface EditApiKeyFormData {
+  applicationDescription: string;
+  applicationContactEmail: string;
+}
+
+const INITIAL_FORM_DATA: EditApiKeyFormData = {
+  applicationDescription: "",
+  applicationContactEmail: "",
+};
+
+interface EditFieldConfig {
+  key: keyof EditApiKeyFormData;
+  label: string;
+  placeholder: string;
+  type?: string;
+  required?: boolean;
+}
+
+const EDIT_FIELDS: readonly EditFieldConfig[] = [
+  {
+    key: "applicationDescription",
+    label: "Description",
+    placeholder: "What this integration does",
+  },
+  {
+    key: "applicationContactEmail",
+    label: "Application Contact Email *",
+    placeholder: "ops@example.com",
+    type: "email",
+    required: true,
+  },
+] as const;
+
 // ADR-012 Phase A (PR A5, AC7): only these two fields are ever editable —
 // name/scopes/oidcClientId stay permanently immutable after creation
 // (see update.ts's own comment for the full reasoning). Mirrors
@@ -24,20 +57,29 @@ export function EditApiKeyModal({
   onClose,
   onSaved,
 }: EditApiKeyModalProps): React.ReactElement {
-  const [applicationDescription, setApplicationDescription] = useState("");
-  const [applicationContactEmail, setApplicationContactEmail] = useState("");
+  const [formData, setFormData] =
+    useState<EditApiKeyFormData>(INITIAL_FORM_DATA);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (keyRow) {
-      setApplicationDescription(keyRow.applicationDescription ?? "");
-      setApplicationContactEmail(keyRow.applicationContactEmail ?? "");
+      setFormData({
+        applicationDescription: keyRow.applicationDescription ?? "",
+        applicationContactEmail: keyRow.applicationContactEmail ?? "",
+      });
       setError(null);
     }
   }, [keyRow]);
 
-  const isValid = applicationContactEmail.trim().length > 0;
+  const isValid = formData.applicationContactEmail.trim().length > 0;
+
+  function updateField<K extends keyof EditApiKeyFormData>(
+    key: K,
+    value: EditApiKeyFormData[K],
+  ): void {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+  }
 
   async function handleSave(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -48,8 +90,9 @@ export function EditApiKeyModal({
       await fetchWithAuth(`${API_URL}/api-keys/${keyRow.id}`, {
         method: "PATCH",
         body: JSON.stringify({
-          applicationDescription: applicationDescription.trim() || null,
-          applicationContactEmail: applicationContactEmail.trim(),
+          applicationDescription:
+            formData.applicationDescription.trim() || null,
+          applicationContactEmail: formData.applicationContactEmail.trim(),
         }),
       });
       onSaved();
@@ -109,27 +152,19 @@ export function EditApiKeyModal({
         )}
 
         <form onSubmit={(e) => void handleSave(e)}>
-          <div className="form-group">
-            <label className="form-label">Description</label>
-            <input
-              className="form-input"
-              placeholder="What this integration does"
-              value={applicationDescription}
-              onChange={(e) => setApplicationDescription(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Application Contact Email *</label>
-            <input
-              className="form-input"
-              type="email"
-              placeholder="ops@example.com"
-              value={applicationContactEmail}
-              onChange={(e) => setApplicationContactEmail(e.target.value)}
-              required
-            />
-          </div>
+          {EDIT_FIELDS.map((f) => (
+            <div key={f.key} className="form-group">
+              <label className="form-label">{f.label}</label>
+              <input
+                className="form-input"
+                type={f.type ?? "text"}
+                placeholder={f.placeholder}
+                value={formData[f.key]}
+                onChange={(e) => updateField(f.key, e.target.value)}
+                required={f.required}
+              />
+            </div>
+          ))}
 
           <Button
             type="submit"
