@@ -438,6 +438,46 @@ interface ScheduleFormModalProps {
   onDelete?: (() => void) | undefined;
 }
 
+interface ScheduleFormData {
+  label: string;
+  startsAt: string;
+  endsAt: string;
+  primaryUserId: string;
+  backupUserId: string;
+  escalationManagerUserId: string;
+}
+
+function getInitialScheduleFormData(
+  schedule?: OnCallSchedule | null,
+): ScheduleFormData {
+  return {
+    label: schedule?.label ?? "",
+    startsAt: schedule ? toLocalInputValue(schedule.startsAt) : "",
+    endsAt: schedule ? toLocalInputValue(schedule.endsAt) : "",
+    primaryUserId: schedule?.primaryUserId ?? "",
+    backupUserId: schedule?.backupUserId ?? "",
+    escalationManagerUserId: schedule?.escalationManagerUserId ?? "",
+  };
+}
+
+const ON_CALL_ROLE_FIELDS: ReadonlyArray<{
+  key: "primaryUserId" | "backupUserId" | "escalationManagerUserId";
+  label: string;
+  placeholder: string;
+}> = [
+  {
+    key: "primaryUserId",
+    label: "Primary on-call *",
+    placeholder: "Select a user",
+  },
+  { key: "backupUserId", label: "Backup on-call", placeholder: "None" },
+  {
+    key: "escalationManagerUserId",
+    label: "Escalation manager",
+    placeholder: "None",
+  },
+] as const;
+
 function ScheduleFormModal({
   open,
   schedule,
@@ -447,21 +487,8 @@ function ScheduleFormModal({
   onSaved,
   onDelete,
 }: ScheduleFormModalProps): React.ReactElement {
-  const [label, setLabel] = useState(schedule?.label ?? "");
-  const [startsAt, setStartsAt] = useState(
-    schedule ? toLocalInputValue(schedule.startsAt) : "",
-  );
-  const [endsAt, setEndsAt] = useState(
-    schedule ? toLocalInputValue(schedule.endsAt) : "",
-  );
-  const [primaryUserId, setPrimaryUserId] = useState(
-    schedule?.primaryUserId ?? "",
-  );
-  const [backupUserId, setBackupUserId] = useState(
-    schedule?.backupUserId ?? "",
-  );
-  const [escalationManagerUserId, setEscalationManagerUserId] = useState(
-    schedule?.escalationManagerUserId ?? "",
+  const [formData, setFormData] = useState<ScheduleFormData>(() =>
+    getInitialScheduleFormData(schedule),
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -475,15 +502,26 @@ function ScheduleFormModal({
 
   useEffect(() => {
     if (open) {
-      setLabel(schedule?.label ?? "");
-      setStartsAt(schedule ? toLocalInputValue(schedule.startsAt) : "");
-      setEndsAt(schedule ? toLocalInputValue(schedule.endsAt) : "");
-      setPrimaryUserId(schedule?.primaryUserId ?? "");
-      setBackupUserId(schedule?.backupUserId ?? "");
-      setEscalationManagerUserId(schedule?.escalationManagerUserId ?? "");
+      setFormData(getInitialScheduleFormData(schedule));
       setError(null);
     }
   }, [open, schedule]);
+
+  const {
+    label,
+    startsAt,
+    endsAt,
+    primaryUserId,
+    backupUserId,
+    escalationManagerUserId,
+  } = formData;
+
+  function updateField<K extends keyof ScheduleFormData>(
+    key: K,
+    val: ScheduleFormData[K],
+  ): void {
+    setFormData((prev) => ({ ...prev, [key]: val }));
+  }
 
   // PR #623 review (Vijit), G3: a schedule where primary/backup/escalation
   // overlap is a silent misconfiguration -- backup gets paged alongside
@@ -598,7 +636,7 @@ function ScheduleFormModal({
               placeholder="e.g. Week 1"
               value={label}
               autoFocus
-              onChange={(e) => setLabel(e.target.value)}
+              onChange={(e) => updateField("label", e.target.value)}
               required
               maxLength={200}
             />
@@ -610,7 +648,7 @@ function ScheduleFormModal({
                 className="form-input"
                 type="datetime-local"
                 value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
+                onChange={(e) => updateField("startsAt", e.target.value)}
                 required
               />
             </div>
@@ -620,41 +658,23 @@ function ScheduleFormModal({
                 className="form-input"
                 type="datetime-local"
                 value={endsAt}
-                onChange={(e) => setEndsAt(e.target.value)}
+                onChange={(e) => updateField("endsAt", e.target.value)}
                 required
               />
             </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">Primary on-call *</label>
-            <UserPicker
-              users={users}
-              value={primaryUserId || null}
-              onChange={(id) => setPrimaryUserId(id ?? "")}
-              placeholder="Select a user"
-              portalContainer={contentNode}
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Backup on-call</label>
-            <UserPicker
-              users={users}
-              value={backupUserId || null}
-              onChange={(id) => setBackupUserId(id ?? "")}
-              placeholder="None"
-              portalContainer={contentNode}
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Escalation manager</label>
-            <UserPicker
-              users={users}
-              value={escalationManagerUserId || null}
-              onChange={(id) => setEscalationManagerUserId(id ?? "")}
-              placeholder="None"
-              portalContainer={contentNode}
-            />
-          </div>
+          {ON_CALL_ROLE_FIELDS.map(({ key, label: roleLabel, placeholder }) => (
+            <div key={key} className="form-group">
+              <label className="form-label">{roleLabel}</label>
+              <UserPicker
+                users={users}
+                value={formData[key] || null}
+                onChange={(id) => updateField(key, id ?? "")}
+                placeholder={placeholder}
+                portalContainer={contentNode}
+              />
+            </div>
+          ))}
           {hasDuplicateAssignees && (
             <div className="alert alert-error" style={{ marginTop: 8 }}>
               Primary, backup, and escalation manager must be different people —

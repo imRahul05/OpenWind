@@ -1104,74 +1104,62 @@ function RuleFormModal({
             <div className="form-group">
               <label className="form-label">Assign To *</label>
               <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                <button
-                  type="button"
-                  className="portal-btn-secondary"
-                  style={{
-                    padding: "5px 12px",
-                    fontWeight: 600,
-                    background:
-                      formData.assignMode === "user"
-                        ? "var(--accent-primary)"
-                        : "var(--bg-primary)",
-                    color:
-                      formData.assignMode === "user"
-                        ? "#fff"
-                        : "var(--text-primary)",
-                  }}
-                  onClick={() => updateField("assignMode", "user")}
-                >
-                  User
-                </button>
-                <button
-                  type="button"
-                  className="portal-btn-secondary"
-                  style={{
-                    padding: "5px 12px",
-                    fontWeight: 600,
-                    background:
-                      formData.assignMode === "team"
-                        ? "var(--accent-primary)"
-                        : "var(--bg-primary)",
-                    color:
-                      formData.assignMode === "team"
-                        ? "#fff"
-                        : "var(--text-primary)",
-                  }}
-                  onClick={() => updateField("assignMode", "team")}
-                >
-                  Team
-                </button>
+                {(["user", "team"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className="portal-btn-secondary"
+                    style={{
+                      padding: "5px 12px",
+                      fontWeight: 600,
+                      textTransform: "capitalize",
+                      background:
+                        formData.assignMode === mode
+                          ? "var(--accent-primary)"
+                          : "var(--bg-primary)",
+                      color:
+                        formData.assignMode === mode
+                          ? "#fff"
+                          : "var(--text-primary)",
+                    }}
+                    onClick={() => updateField("assignMode", mode)}
+                  >
+                    {mode}
+                  </button>
+                ))}
               </div>
-              {formData.assignMode === "user" ? (
-                <select
-                  className="form-input"
-                  value={formData.assignedTo}
-                  onChange={(e) => updateField("assignedTo", e.target.value)}
-                  required
-                >
-                  <option value="">Select a user…</option>
-                  {users.map((u) => (
-                    <option key={u.userId} value={u.userId}>
-                      {u.displayName}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <select
-                  className="form-input"
-                  value={formData.teamId}
-                  onChange={(e) => updateField("teamId", e.target.value)}
-                  required
-                >
-                  <option value="">Select a team…</option>
-                  {teams.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <select
+                className="form-input"
+                value={
+                  formData.assignMode === "user"
+                    ? formData.assignedTo
+                    : formData.teamId
+                }
+                onChange={(e) =>
+                  updateField(
+                    formData.assignMode === "user" ? "assignedTo" : "teamId",
+                    e.target.value,
+                  )
+                }
+                required
+              >
+                <option value="">
+                  {formData.assignMode === "user"
+                    ? "Select a user…"
+                    : "Select a team…"}
+                </option>
+                {formData.assignMode === "user"
+                  ? users.map((u) => (
+                      <option key={u.userId} value={u.userId}>
+                        {u.displayName}
+                      </option>
+                    ))
+                  : teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+              </select>
               {formData.assignMode === "team" && (
                 <p className="page-subtitle" style={{ marginTop: 6 }}>
                   Resolves to the team's on-call primary at fire time (falling
