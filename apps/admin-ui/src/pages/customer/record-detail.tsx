@@ -1270,6 +1270,7 @@ export function CustomerRecordDetail(): React.ReactElement {
     new Set(),
   );
   const initializedCollapse = useRef(false);
+  const activeTicketIdRef = useRef<string | null>(id ?? null);
   const commentsScrollRef = useRef<HTMLDivElement>(null);
   const historyScrollRef = useRef<HTMLDivElement>(null);
   const tabsScrollRef = useRef<HTMLDivElement>(null);
@@ -1736,8 +1737,8 @@ export function CustomerRecordDetail(): React.ReactElement {
     return actorDisplayName ?? fromList ?? "Unknown";
   };
 
-  function loadRecord(): Promise<void> {
-    if (!id) return Promise.resolve();
+  function loadRecord(targetId: string | undefined = id): Promise<boolean> {
+    if (!targetId) return Promise.resolve(false);
     setError(null);
     setNoAccess(false);
     // Fetch the record first — its own entityTypeId is authoritative, unlike
@@ -1746,12 +1747,13 @@ export function CustomerRecordDetail(): React.ReactElement {
     // sequentially rather than as a reactive dependency, avoids a setRecord(null)
     // → effectiveEntityTypeId flips back to the guess → re-fires effect loop.
     let recordFetchFailed = false;
-    return fetchWithAuth(`${API_URL}/entities/${id}`)
+    return fetchWithAuth(`${API_URL}/entities/${targetId}`)
       .catch((err: unknown) => {
         recordFetchFailed = true;
         throw err;
       })
       .then((recRes) => {
+        if (activeTicketIdRef.current !== targetId) return null;
         const rec = (recRes as { data: EntityInstance }).data;
         return Promise.all([
           fetchWithAuth(`${API_URL}/entity-types/${rec.entityTypeId}/fields`),
@@ -1759,12 +1761,14 @@ export function CustomerRecordDetail(): React.ReactElement {
           fetchUsersShared()
             .then((users) => ({ data: users }))
             .catch(() => ({ data: [] })),
-          fetchWithAuth(`${API_URL}/entities/${id}/access`).catch(() => ({
+          fetchWithAuth(`${API_URL}/entities/${targetId}/access`).catch(() => ({
             data: [],
           })),
         ]);
       })
-      .then(([fieldsRes, recRes, usersRes, accessRes]) => {
+      .then((results) => {
+        if (!results || activeTicketIdRef.current !== targetId) return false;
+        const [fieldsRes, recRes, usersRes, accessRes] = results;
         setFields(
           (fieldsRes as { data: EntityField[] }).data.filter(
             (f) => !f.isSystem,
@@ -1788,29 +1792,38 @@ export function CustomerRecordDetail(): React.ReactElement {
           return [...apiUsers, ...prev.filter((u) => !apiIds.has(u.userId))];
         });
         setAccessList((accessRes as { data?: AccessEntry[] }).data ?? []);
+        return true;
       })
       .catch((err: unknown) => {
+        if (activeTicketIdRef.current !== targetId) return false;
         const status = (err as { status?: number } | undefined)?.status;
         if (recordFetchFailed && status === 404) {
           setNoAccess(true);
         } else {
           setError(err instanceof Error ? err.message : "Failed to load");
         }
+        return false;
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (activeTicketIdRef.current === targetId) {
+          setLoading(false);
+        }
+      });
   }
 
   async function refreshAll(): Promise<void> {
     if (manualRefreshing) return;
     setManualRefreshing(true);
     try {
-      await Promise.all([
-        loadRecord(),
-        refreshComments(),
-        refreshAttachments(),
-        loadChildren(),
-        historyLoaded ? refreshHistory() : Promise.resolve(),
-      ]);
+      const ok = await loadRecord();
+      if (ok && activeTicketIdRef.current === id) {
+        await Promise.all([
+          refreshComments(),
+          refreshAttachments(),
+          loadChildren(),
+          historyLoaded ? refreshHistory() : Promise.resolve(),
+        ]);
+      }
     } finally {
       setManualRefreshing(false);
     }
@@ -1830,25 +1843,33 @@ export function CustomerRecordDetail(): React.ReactElement {
     }
   }
 
-  async function loadComments(): Promise<void> {
-    if (!id) return;
+  async function loadComments(
+    targetId: string | undefined = id,
+  ): Promise<void> {
+    if (!targetId) return;
     const res = await fetchWithAuth(
-      `${API_URL}/entities/${id}/transitions/history?eventType=comment`,
+      `${API_URL}/entities/${targetId}/transitions/history?eventType=comment`,
     ).catch(() => ({ data: [] }));
-    setComments((res as { data?: WorkflowEvent[] }).data ?? []);
+    if (activeTicketIdRef.current === targetId) {
+      setComments((res as { data?: WorkflowEvent[] }).data ?? []);
+    }
   }
 
-  async function loadHistory(): Promise<void> {
-    if (!id || historyLoaded) return;
+  async function loadHistory(targetId: string | undefined = id): Promise<void> {
+    if (!targetId || historyLoaded) return;
     setHistoryLoading(true);
     try {
       const res = await fetchWithAuth(
-        `${API_URL}/entities/${id}/transitions/history?eventType=history`,
+        `${API_URL}/entities/${targetId}/transitions/history?eventType=history`,
       ).catch(() => ({ data: [] }));
-      setHistoryEvents((res as { data?: WorkflowEvent[] }).data ?? []);
-      setHistoryLoaded(true);
+      if (activeTicketIdRef.current === targetId) {
+        setHistoryEvents((res as { data?: WorkflowEvent[] }).data ?? []);
+        setHistoryLoaded(true);
+      }
     } finally {
-      setHistoryLoading(false);
+      if (activeTicketIdRef.current === targetId) {
+        setHistoryLoading(false);
+      }
     }
   }
 
@@ -1892,50 +1913,70 @@ export function CustomerRecordDetail(): React.ReactElement {
     if (el) el.scrollTop = el.scrollHeight;
   }, [historyLoaded, historyEvents]);
 
-  async function refreshComments(): Promise<void> {
-    await loadComments();
+  async function refreshComments(
+    targetId: string | undefined = id,
+  ): Promise<void> {
+    await loadComments(targetId);
   }
 
-  async function refreshHistory(): Promise<void> {
-    if (!id) return;
+  async function refreshHistory(
+    targetId: string | undefined = id,
+  ): Promise<void> {
+    if (!targetId) return;
     setHistoryLoaded(false);
     setHistoryLoading(true);
     try {
       const res = await fetchWithAuth(
-        `${API_URL}/entities/${id}/transitions/history?eventType=history`,
+        `${API_URL}/entities/${targetId}/transitions/history?eventType=history`,
       ).catch(() => ({ data: [] }));
-      setHistoryEvents((res as { data?: WorkflowEvent[] }).data ?? []);
-      setHistoryLoaded(true);
+      if (activeTicketIdRef.current === targetId) {
+        setHistoryEvents((res as { data?: WorkflowEvent[] }).data ?? []);
+        setHistoryLoaded(true);
+      }
     } finally {
-      setHistoryLoading(false);
+      if (activeTicketIdRef.current === targetId) {
+        setHistoryLoading(false);
+      }
     }
   }
 
-  async function refreshAttachments(): Promise<void> {
-    if (!id) return;
+  async function refreshAttachments(
+    targetId: string | undefined = id,
+  ): Promise<void> {
+    if (!targetId) return;
     setAttachmentsLoading(true);
     try {
       const res = (await fetchWithAuth(
-        `${API_URL}/entities/${id}/attachments`,
+        `${API_URL}/entities/${targetId}/attachments`,
       )) as { data: AttachmentFile[] };
-      setAttachments(res.data);
+      if (activeTicketIdRef.current === targetId) {
+        setAttachments(res.data);
+      }
     } catch {
       /* best-effort */
     } finally {
-      setAttachmentsLoading(false);
+      if (activeTicketIdRef.current === targetId) {
+        setAttachmentsLoading(false);
+      }
     }
   }
 
-  async function loadChildren(): Promise<void> {
-    if (!id) return;
+  async function loadChildren(
+    targetId: string | undefined = id,
+  ): Promise<void> {
+    if (!targetId) return;
     setChildrenLoading(true);
     try {
       const res = await fetchWithAuth(
-        `${API_URL}/entities/${id}/children`,
+        `${API_URL}/entities/${targetId}/children`,
       ).catch(() => ({ data: [] }));
-      setChildren((res as { data: ChildInstance[] }).data);
+      if (activeTicketIdRef.current === targetId) {
+        setChildren((res as { data: ChildInstance[] }).data);
+      }
     } finally {
-      setChildrenLoading(false);
+      if (activeTicketIdRef.current === targetId) {
+        setChildrenLoading(false);
+      }
     }
   }
 
@@ -2153,18 +2194,26 @@ export function CustomerRecordDetail(): React.ReactElement {
     }
   }
 
-  async function loadAccessRequests(): Promise<void> {
-    if (!id) return;
+  async function loadAccessRequests(
+    targetId: string | undefined = id,
+  ): Promise<void> {
+    if (!targetId) return;
     try {
       const res = await fetchWithAuth(
-        `${API_URL}/entities/${id}/access-requests`,
+        `${API_URL}/entities/${targetId}/access-requests`,
       );
-      const rows = (res as { data: AccessRequest[] }).data;
-      setAccessReqList(rows);
+      if (activeTicketIdRef.current === targetId) {
+        const rows = (res as { data: AccessRequest[] }).data;
+        setAccessReqList(rows);
+      }
     } catch {
-      setAccessReqList([]);
+      if (activeTicketIdRef.current === targetId) {
+        setAccessReqList([]);
+      }
     } finally {
-      setAccessReqLoaded(true);
+      if (activeTicketIdRef.current === targetId) {
+        setAccessReqLoaded(true);
+      }
     }
   }
 
@@ -2518,6 +2567,8 @@ export function CustomerRecordDetail(): React.ReactElement {
   useEffect(() => {
     // Clear all derived state immediately so the UI shows the spinner rather
     // than the previous record's data while the new one loads.
+    const currentId = id ?? null;
+    activeTicketIdRef.current = currentId;
     setLoading(true);
     setRecord(null);
     setComments([]);
@@ -2532,12 +2583,20 @@ export function CustomerRecordDetail(): React.ReactElement {
     setError(null);
     setTags([]);
     initializedCollapse.current = false;
-    void Promise.all([
-      loadRecord(),
-      loadComments(),
-      refreshAttachments(),
-      loadTags(),
-    ]);
+
+    if (!currentId) {
+      setLoading(false);
+      return;
+    }
+
+    void loadRecord(currentId).then((success) => {
+      if (!success || activeTicketIdRef.current !== currentId) return;
+      void Promise.all([
+        loadComments(currentId),
+        refreshAttachments(currentId),
+        loadTags(currentId),
+      ]);
+    });
   }, [id]);
 
   // Load access requests when owner (creator/assignee) or admin/agent — must
@@ -2545,7 +2604,7 @@ export function CustomerRecordDetail(): React.ReactElement {
   // admin/agent viewer never gets the initial/live list despite the tab
   // showing for them.
   useEffect(() => {
-    if ((isOwner || isAdminOrAgent) && id) void loadAccessRequests();
+    if ((isOwner || isAdminOrAgent) && id) void loadAccessRequests(id);
   }, [isOwner, isAdminOrAgent, id]);
 
   // Ticket-room live updates (docs/specs/ticket-live-updates.md) — re-fetches
@@ -2714,16 +2773,20 @@ export function CustomerRecordDetail(): React.ReactElement {
     }
   }
 
-  async function loadTags(): Promise<void> {
-    if (!id) return;
+  async function loadTags(targetId: string | undefined = id): Promise<void> {
+    if (!targetId) return;
     setTagsLoading(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/entities/${id}/tags`);
-      setTags((res as { data?: EntityInstanceTag[] }).data ?? []);
+      const res = await fetchWithAuth(`${API_URL}/entities/${targetId}/tags`);
+      if (activeTicketIdRef.current === targetId) {
+        setTags((res as { data?: EntityInstanceTag[] }).data ?? []);
+      }
     } catch {
       /* ignore — tags panel just stays empty */
     } finally {
-      setTagsLoading(false);
+      if (activeTicketIdRef.current === targetId) {
+        setTagsLoading(false);
+      }
     }
   }
 
