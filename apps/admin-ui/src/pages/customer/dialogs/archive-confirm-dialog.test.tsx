@@ -20,9 +20,7 @@ describe("ArchiveConfirmDialog", () => {
 
     expect(screen.getByText("Archive this record?")).toBeDefined();
     expect(screen.getByText(/3 sub-tasks/)).toBeDefined();
-    expect(
-      screen.getByRole("button", { name: "Archive record" }),
-    ).toBeDefined();
+    expect(screen.getByRole("button", { name: "Archive all 4" })).toBeDefined();
   });
 
   it("handles singular child count correctly", () => {
@@ -51,7 +49,7 @@ describe("ArchiveConfirmDialog", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Archive record" }));
+    fireEvent.click(screen.getByRole("button", { name: "Archive all 1" }));
     expect(handleConfirm).toHaveBeenCalledTimes(1);
   });
 

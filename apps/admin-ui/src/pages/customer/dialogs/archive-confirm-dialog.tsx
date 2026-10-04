@@ -7,6 +7,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogTitle,
+  Button,
   DIALOG_CONTENT_RESET,
 } from "@platform/ui";
 
@@ -47,19 +48,22 @@ export function ArchiveConfirmDialog({
         </div>
         <AlertDialogFooter className="modal-footer">
           <AlertDialogCancel asChild>
-            <button type="button" className="btn-secondary" disabled={loading}>
+            <Button variant="secondary" disabled={loading}>
               Cancel
-            </button>
+            </Button>
           </AlertDialogCancel>
           <AlertDialogAction asChild>
-            <button
-              type="button"
-              className="btn-danger"
+            <Button
+              variant="primary"
+              className="rcd-btn-archive-confirm"
               disabled={loading}
-              onClick={() => void onConfirm()}
+              onClick={(e) => {
+                e.preventDefault();
+                void onConfirm();
+              }}
             >
-              {loading ? "Archiving…" : "Archive record"}
-            </button>
+              {loading ? "Archiving…" : `Archive all ${childCount + 1}`}
+            </Button>
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
